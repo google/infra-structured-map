@@ -24,6 +24,7 @@
   <version>0.0.1-SNAPSHOT</version>
 
   <name>infra-structured-map</name>
+  <description>A tool for creating interactive maps of capital infrastructure projects in a given area.  The tool consumes KML and Markdown to produce a web-based map.</description>
 
   <licenses>
     <license>
