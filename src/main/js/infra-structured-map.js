@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 (function(root) {
-
   function InfraStructuredMap(map) {
     this.map = map;
 
-    var infoWindow = new google.maps.InfoWindow();
+    const infoWindow = new google.maps.InfoWindow();
 
     this.map.showInfoWindow = function(content, position) {
       infoWindow.setContent(content);
@@ -27,10 +26,11 @@
     };
 
     this.projectsById = new Map();
-    this.modeIds = new PropertyIds(["Pedestrian / Bike", "Transit", "Freight", "Other"]);
-    this.statusIds = new PropertyIds(["completed", "planned", "eval"]);
-    this.timelineIds = new PropertyIds(["completed", "now", "soon", "someday"]);
-    this.segments = new Array();
+    this.modeIds = new PropertyIds(
+      ['Pedestrian / Bike', 'Transit', 'Freight', 'Other']);
+    this.statusIds = new PropertyIds(['completed', 'planned', 'eval']);
+    this.timelineIds = new PropertyIds(['completed', 'now', 'soon', 'someday']);
+    this.segments = [];
     this.placemarks = [];
 
     this.masks = new PropertyMasks();
@@ -45,28 +45,34 @@
     this.colorsByTitle.set('Other', 'rgb(230, 81, 0)');
   };
 
-  InfraStructuredMap.prototype.addModePropertyToggle = function(checkbox, propertyId) {
+  InfraStructuredMap.prototype.addModePropertyToggle =
+    function(checkbox, propertyId) {
     this.addPropertyToggle(checkbox, this.modeIds, propertyId, this.masks.mode);
   };
 
-  InfraStructuredMap.prototype.addStatusPropertyToggle = function(checkbox, propertyId) {
-    this.addPropertyToggle(checkbox, this.statusIds, propertyId, this.masks.status);
+  InfraStructuredMap.prototype.addStatusPropertyToggle =
+    function(checkbox, propertyId) {
+      this.addPropertyToggle(
+        checkbox, this.statusIds, propertyId, this.masks.status);
   };
 
-  InfraStructuredMap.prototype.addTimelinePropertyToggle = function(checkbox, propertyId) {
-    this.addPropertyToggle(checkbox, this.timelineIds, propertyId, this.masks.timeline);
+  InfraStructuredMap.prototype.addTimelinePropertyToggle =
+    function(checkbox, propertyId) {
+      this.addPropertyToggle(
+        checkbox, this.timelineIds, propertyId, this.masks.timeline);
   };
 
-  InfraStructuredMap.prototype.addPropertyToggle = function(checkbox, propertyIds, propertyId, propertyMask) {
-    var index = propertyIds.getIndex(propertyId);
+  InfraStructuredMap.prototype.addPropertyToggle =
+    function(checkbox, propertyIds, propertyId, propertyMask) {
+    const index = propertyIds.getIndex(propertyId);
     propertyMask.setEnabled(index, checkbox.checked);
-    checkbox.addEventListener('change', function (event) {
+    checkbox.addEventListener('change', function(event) {
       propertyMask.setEnabled(index, checkbox.checked);
-      for (var segment of this.segments) {
-	segment.updateChannels(this.masks);
+      for (const segment of this.segments) {
+        segment.updateChannels(this.masks);
       }
-      for (var placemark of this.placemarks) {
-	placemark.updateChannels(this.masks);
+      for (const placemark of this.placemarks) {
+        placemark.updateChannels(this.masks);
       }
     }.bind(this));
   };
@@ -75,60 +81,60 @@
     this.projectsById.clear();
 
     // Build up a mapping of all projects
-    for (var feature of data.features) {
-      var projects = [];
-      for (var project of feature.projects) {
-	projects.push(this.createProjectRef(project));
+    for (const feature of data.features) {
+      const projects = [];
+      for (const project of feature.projects) {
+        projects.push(this.createProjectRef(project));
       }
       this.projectsById.set(feature.id, projects);
     }
 
-    this.segments = new Array();
-    for (var segment of data.segments) {
-      var channels = this.constructChannelsFromFeatureIds(segment.ids);
-      var ms = new MapSegment(this.map, channels, segment);
+    this.segments = [];
+    for (const segment of data.segments) {
+      const channels = this.constructChannelsFromFeatureIds(segment.ids);
+      const ms = new MapSegment(this.map, channels, segment);
       ms.updateChannels(this.masks);
       this.segments.push(ms);
     }
 
-    this.placemarks = new Array();
-    for (var placemark of data.placemarks) {
-      var position = new google.maps.LatLng(placemark.lat, placemark.lng);
-      var channels = this.constructChannelsFromFeatureIds(placemark.ids);
-      var place = new MapPlacemark(this.map, channels, position);
+    this.placemarks = [];
+    for (const placemark of data.placemarks) {
+      const position = new google.maps.LatLng(placemark.lat, placemark.lng);
+      const channels = this.constructChannelsFromFeatureIds(placemark.ids);
+      const place = new MapPlacemark(this.map, channels, position);
       place.updateChannels(this.masks);
       this.placemarks.push(place);
     }
   };
 
   InfraStructuredMap.prototype.constructChannelsFromFeatureIds = function(ids) {
-    var channels = [];
-    var channelsByColor = new Map();
-    for (var featureId of ids) {
-      for (var project of this.projectsById.get(featureId)) {
-	var channel = channelsByColor.get(project.color);
-	if (!channel) {
-	  channel = new MapChannel(project.color);
-	  channelsByColor.set(project.color, channel);
-	  channels.push(channel);
-	}
-	channel.projectRefs.push(project);
+    const channels = [];
+    const channelsByColor = new Map();
+    for (const featureId of ids) {
+      for (const project of this.projectsById.get(featureId)) {
+        let channel = channelsByColor.get(project.color);
+        if (!channel) {
+          channel = new MapChannel(project.color);
+          channelsByColor.set(project.color, channel);
+          channels.push(channel);
+        }
+        channel.projectRefs.push(project);
       }
     }
     return channels;
   };
 
   InfraStructuredMap.prototype.createProjectRef = function(project) {
-    var masks = new PropertyMasks();
+    const masks = new PropertyMasks();
     masks.mode.setEnabled(this.modeIds.getIndex(project.title[0]), true);
     masks.status.setEnabled(this.statusIds.getIndex(project.status), true);
     if (project.timeline) {
       masks.timeline.setEnabled(
-	this.timelineIds.getIndex(project.timeline), true);
+        this.timelineIds.getIndex(project.timeline), true);
     } else {
       masks.timeline.setEnabledAll(true);
     }
-    var color = this.colorsByTitle.get(project.title[0]);
+    let color = this.colorsByTitle.get(project.title[0]);
     if (project.color) {
       color = project.color;
     }
@@ -149,13 +155,13 @@
 
   MapFeature.prototype.updateChannelMask = function(propertyMasks) {
     this.masks = propertyMasks;
-    var newMask = [];
-    var activeChannelCount = 0;
-    for (var channel of this.channels) {
-      var active = channel.projectRefs.isActive(propertyMasks);
+    const newMask = [];
+    let activeChannelCount = 0;
+    for (const channel of this.channels) {
+      const active = channel.projectRefs.isActive(propertyMasks);
       newMask.push(active);
       if (active) {
-	activeChannelCount++;
+        activeChannelCount++;
       }
     }
     if (channelMasksAreEqual(this.channelMask, newMask)) {
@@ -164,46 +170,46 @@
     this.channelMask = newMask;
     this.activeChannelCount = activeChannelCount;
     return true;
-  }
+  };
 
   MapFeature.prototype.handleClick_ = function(event) {
-    var content = '';
-    for (var index = 0; index < this.channels.length; ++index) {
+    let content = '';
+    for (let index = 0; index < this.channels.length; ++index) {
       if (!this.channelMask[index]) {
-	continue;
+        continue;
       }
-      var channel = this.channels[index];
-      for (var projectRef of channel.projectRefs.refs) {
-	if (projectRef.propertyMasks.isActive(this.masks)) {
-	  content += projectRef.titles.join(' - ') + ' <br/>\n';
-	}
+      const channel = this.channels[index];
+      for (const projectRef of channel.projectRefs.refs) {
+        if (projectRef.propertyMasks.isActive(this.masks)) {
+          content += projectRef.titles.join(' - ') + ' <br/>\n';
+        }
       }
     }
     this.map.showInfoWindow(content, event.latLng);
-  }
+  };
 
   function channelMasksAreEqual(lhs, rhs) {
     if (lhs.length != rhs.length) {
       return false;
     }
-    for (var i = 0; i < lhs.length; ++i) {
+    for (let i = 0; i < lhs.length; ++i) {
       if (lhs[i] != rhs[i]) {
-	return false;
+        return false;
       }
     }
     return true;
-  }
+  };
 
   function MapSegment(map, channels, segment) {
     MapFeature.call(this, map, channels);
 
-    var path = google.maps.geometry.encoding.decodePath(segment.line);
+    const path = google.maps.geometry.encoding.decodePath(segment.line);
     this.options = {
       path: path,
       strokeOpacity: 0,
       icons: [],
       map: map,
-      clickable: true
+      clickable: true,
     };
     this.polyline = new google.maps.Polyline(this.options);
     google.maps.event.addListener(
@@ -216,18 +222,18 @@
     if (!this.updateChannelMask(propertyMasks)) {
       return;
     }
-    var offset = -(this.activeChannelCount - 1) / 2;
-    var icons = new Array();
-    for (var index = 0; index < this.channels.length; ++index) {
+    let offset = -(this.activeChannelCount - 1) / 2;
+    const icons = [];
+    for (let index = 0; index < this.channels.length; ++index) {
       if (!this.channelMask[index]) {
-	continue;
+        continue;
       }
-      var channel = this.channels[index];
-      var symbol = {
-	path: 'M ' + offset + ',-0.2 ' + offset + ',0',
-	strokeOpacity: 1,
-	strokeColor: channel.color,
-	scale: 5
+      const channel = this.channels[index];
+      const symbol = {
+        path: 'M ' + offset + ',-0.2 ' + offset + ',0',
+        strokeOpacity: 1,
+        strokeColor: channel.color,
+        scale: 5,
       };
       icons.push({icon: symbol, offset: '0', repeat: '2px'});
       offset++;
@@ -245,44 +251,48 @@
 
   MapPlacemark.prototype = new MapFeature();
 
+  function circlePath(r) {
+    return `m -${r},0 a ${r},${r} 0 1,0 ${2*r},0 a ${r},${r} 0 1,0 -${2*r},0`;
+  };
+
   MapPlacemark.prototype.updateChannels = function(propertyMasks) {
     if (!this.updateChannelMask(propertyMasks)) {
       return;
     }
 
     // Clear any existing markers
-    for (var marker of this.markers) {
+    for (const marker of this.markers) {
       marker.setMap(null);
     }
     this.markers = [];
 
-    var offset = 0;
-    for (var index = 0; index < this.channels.length; ++index) {
+    let offset = 0;
+    for (let index = 0; index < this.channels.length; ++index) {
       if (!this.channelMask[index]) {
-	continue;
+        continue;
       }
-      var channel = this.channels[index];
+      const channel = this.channels[index];
 
-      var circle = {
-	path: 'M ' + offset + ',0 m -10,0 a 10,10 0 1,0 20,0 a 10,10 0 1,0 -20,0',
-	fillColor: channel.color,
-	fillOpacity: 1.0,
-	scale: 1,
-	strokeColor: 'white',
-	strokeWeight: 2
+      const circle = {
+        path: 'M ' + offset + ',0 ' + circlePath(10),
+        fillColor: channel.color,
+        fillOpacity: 1.0,
+        scale: 1,
+        strokeColor: 'white',
+        strokeWeight: 2,
       };
-      var options = {
-	position: this.position,
-	icon: circle,
-	map: this.map,
-	clickable: true
+      const options = {
+        position: this.position,
+        icon: circle,
+        map: this.map,
+        clickable: true,
       };
-      var marker = new google.maps.Marker(options);
+      const marker = new google.maps.Marker(options);
       this.markers.push(marker);
       offset += 10;
 
       google.maps.event.addListener(
-	marker, 'click', this.handleClick_.bind(this));
+        marker, 'click', this.handleClick_.bind(this));
     }
   };
 
@@ -301,16 +311,16 @@
 
   function ProjectRefs() {
     this.refs = [];
-  }
+  };
 
   ProjectRefs.prototype.push = function(projectRef) {
     this.refs.push(projectRef);
   };
 
   ProjectRefs.prototype.isActive = function(propertyMasks) {
-    for (var projectRef of this.refs) {
+    for (const projectRef of this.refs) {
       if (projectRef.propertyMasks.isActive(propertyMasks)) {
-	return true;
+        return true;
       }
     }
     return false;
@@ -318,7 +328,7 @@
 
   function PropertyIds(propertyIds) {
     this.idToIndex = new Map();
-    for (var propertyId of propertyIds) {
+    for (const propertyId of propertyIds) {
       this.idToIndex.set(propertyId, this.idToIndex.size);
     }
     return this;
@@ -359,7 +369,7 @@
 
   PropertyMask.prototype.toString = function() {
     return (this.mask >>> 0).toString(2);
-  }
+  };
 
   function PropertyMasks() {
     this.mode = new PropertyMask();
@@ -378,6 +388,5 @@
     return 'mode: ' + this.mode.toString()
       + ' status: ' + this.status.toString()
       + ' time: ' + this.timeline.toString();
-  }
-
+  };
 }(this));
