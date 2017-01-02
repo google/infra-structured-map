@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 (function(root) {
+  /**
+   * The base controller for the Infra-Structred Map.
+   * @constructor
+   * @param {google.maps.Map} map
+   */
   function InfraStructuredMap(map) {
     this.map = map;
 
@@ -92,7 +97,8 @@
     this.segments = [];
     for (const segment of data.segments) {
       const channels = this.constructChannelsFromFeatureIds(segment.ids);
-      const ms = new MapSegment(this.map, channels, segment);
+      const path = google.maps.geometry.encoding.decodePath(segment.line);
+      const ms = new MapSegment(this.map, channels, path);
       ms.updateChannels(this.masks);
       this.segments.push(ms);
     }
@@ -143,7 +149,12 @@
 
   root.InfraStructuredMap = InfraStructuredMap;
 
-
+  /**
+   * A common base class for features displayed on the map.
+   * @constructor
+   * @param {google.maps.Map} map
+   * @param {MapChannel[]} channels
+   */
   function MapFeature(map, channels) {
     this.map = map;
     this.channels = channels;
@@ -188,6 +199,11 @@
     this.map.showInfoWindow(content, event.latLng);
   };
 
+  /**
+   * @param {Boolean[]} lhs
+   * @param {Boolean[]} rhs
+   * @return {Boolean} true if the two arrays are equal
+   */
   function channelMasksAreEqual(lhs, rhs) {
     if (lhs.length != rhs.length) {
       return false;
@@ -200,10 +216,16 @@
     return true;
   };
 
-  function MapSegment(map, channels, segment) {
+  /**
+   * A polyline feature to be displayed on the map.
+   * @constructor
+   * @param {google.maps.Map} map
+   * @param {MapChannel[]} channels
+   * @param {google.maps.LatLng[]} path
+   */
+  function MapSegment(map, channels, path) {
     MapFeature.call(this, map, channels);
 
-    const path = google.maps.geometry.encoding.decodePath(segment.line);
     this.options = {
       path: path,
       strokeOpacity: 0,
@@ -242,6 +264,13 @@
     this.polyline.setOptions(this.options);
   };
 
+  /**
+   * A point feature to be displayed on the map.
+   * @constructor
+   * @param {google.maps.Map} map
+   * @param {MapChannel[]} channels
+   * @param {google.maps.LatLng} position
+   */
   function MapPlacemark(map, channels, position) {
     MapFeature.call(this, map, channels);
     this.position = position;
@@ -251,6 +280,10 @@
 
   MapPlacemark.prototype = new MapFeature();
 
+  /**
+   * @param {Number} r - the radius of the circle
+   * @return {string} an SVG path string for a circle with the given radius
+   */
   function circlePath(r) {
     return `m -${r},0 a ${r},${r} 0 1,0 ${2*r},0 a ${r},${r} 0 1,0 -${2*r},0`;
   };
@@ -296,12 +329,26 @@
     }
   };
 
+  /**
+   * A channel is a collection of {@link ProjectRefs} that all have the same
+   * color.  They will be drawn together when active.
+   * @constructor
+   * @param {string} color - the color for drawing this channel on the map
+   */
   function MapChannel(color) {
     this.projectRefs = new ProjectRefs();
     this.color = color;
     return this;
   };
 
+  /**
+   * A reference to an infrastructure project.
+   * @constructor
+   * @param {PropertyMasks} propertyMasks - the collection of active properties
+         for the project
+   * @param {string[]} titles - the title list (e.g. ["Transit", "Bus 17x"])
+   * @param {string} color - the color for drawing this project on the map
+   */
   function ProjectRef(propertyMasks, titles, color) {
     this.propertyMasks = propertyMasks;
     this.titles = titles;
@@ -309,6 +356,10 @@
     return this;
   };
 
+  /**
+   * A collection of {@link ProjectRef} objects.
+   * @constructor
+   */
   function ProjectRefs() {
     this.refs = [];
   };
@@ -326,6 +377,13 @@
     return false;
   };
 
+  /**
+   * A mapping from a collection of string property ids to their numeric index.
+   * Used in part with {@link PropertyMask}, which tracks which properties are
+   * enabled as identified by their numeric index.
+   * @constructor
+   * @param {string[]} propertyIds - the list of property ids to track
+   */
   function PropertyIds(propertyIds) {
     this.idToIndex = new Map();
     for (const propertyId of propertyIds) {
@@ -334,15 +392,28 @@
     return this;
   }
 
+  /**
+   * @param {string} id - property id
+   * @return {Number} the numeric index associated with the specified property
+   */
   PropertyIds.prototype.getIndex = function(id) {
     return this.idToIndex.get(id);
   };
 
+  /**
+   * A property mask identifies whether individual properties are enabled, as
+   * identified by their numeric index (see {@link PropertyIds}).
+   * @constructor
+   */
   function PropertyMask() {
     this.mask = 0;
     return this;
   };
 
+  /**
+   * @param {Number} rhs - the numeric property index
+   * @return {Boolean} true if the specified property is active
+   */
   PropertyMask.prototype.isActive = function(rhs) {
     return (this.mask & rhs.mask) != 0;
   };
@@ -371,6 +442,11 @@
     return (this.mask >>> 0).toString(2);
   };
 
+  /**
+   * A collection of {@link PropertyMask} objects for mode, status, and
+   * timeline properties.
+   * @constructor
+   */
   function PropertyMasks() {
     this.mode = new PropertyMask();
     this.status = new PropertyMask();
