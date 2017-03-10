@@ -183,8 +183,14 @@
     return true;
   };
 
+  function compareProjectRefs(lhs, rhs) {
+    const lhsTitle = lhs.titles.join(' - ');
+    const rhsTitle = rhs.titles.join(' - ');
+    return lhsTitle.localeCompare(rhsTitle);
+  };
+
   MapFeature.prototype.handleClick_ = function(event) {
-    let content = '';
+    const activeProjects = [];
     for (let index = 0; index < this.channels.length; ++index) {
       if (!this.channelMask[index]) {
         continue;
@@ -192,9 +198,14 @@
       const channel = this.channels[index];
       for (const projectRef of channel.projectRefs.refs) {
         if (projectRef.propertyMasks.isActive(this.masks)) {
-          content += projectRef.titles.join(' - ') + ' <br/>\n';
+          activeProjects.push(projectRef);
         }
       }
+    }
+    activeProjects.sort(compareProjectRefs);
+    let content = '';
+    for (const projectRef of activeProjects) {
+      content += projectRef.titles.join(' - ') + ' <br/>\n';
     }
     this.map.showInfoWindow(content, event.latLng);
   };
