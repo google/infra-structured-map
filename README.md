@@ -45,6 +45,6 @@ Finally, display your data on a webpage:
 
 ```javascript
 var map = new google.maps.Map(element, options);
-var infraMap = new InfraStructuredMap(map);
+var infraMap = new InfraStructuredMap({map: map});
 infraMap.load(data);
 ```

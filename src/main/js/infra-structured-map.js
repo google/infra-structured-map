@@ -15,12 +15,33 @@
  */
 (function(root) {
   /**
+   * Options passed in the construction of InfraStructuredMap.
+   * @interface
+   */
+  function MapOptions () {}
+
+  /**
+   * @type {google.maps.Map}
+   */
+  MapOptions.prototype.map;
+
+  /**
+   * The base href that will be prepended to generated links for project
+   * references.
+   * @type {string}
+   */
+  MapOptions.prototype.baseHref;
+
+  /**
    * The base controller for the Infra-Structred Map.
    * @constructor
-   * @param {google.maps.Map} map
+   * @param {!MapOptions=} opts Options
    */
-  function InfraStructuredMap(map) {
-    this.map = map;
+  function InfraStructuredMap(opts) {
+    var maybeOpts = opts || /** @type {!MapOptions} */ ({});
+
+    this.map = maybeOpts['map'];
+    this.baseHref = maybeOpts['baseHref'];
 
     const infoWindow = new google.maps.InfoWindow();
 
@@ -98,7 +119,7 @@
     for (const segment of data.segments) {
       const channels = this.constructChannelsFromFeatureIds(segment.ids);
       const path = google.maps.geometry.encoding.decodePath(segment.line);
-      const ms = new MapSegment(this.map, channels, path);
+      const ms = new MapSegment(this, channels, path);
       ms.updateChannels(this.masks);
       this.segments.push(ms);
     }
@@ -107,7 +128,7 @@
     for (const placemark of data.placemarks) {
       const position = new google.maps.LatLng(placemark.lat, placemark.lng);
       const channels = this.constructChannelsFromFeatureIds(placemark.ids);
-      const place = new MapPlacemark(this.map, channels, position);
+      const place = new MapPlacemark(this, channels, position);
       place.updateChannels(this.masks);
       this.placemarks.push(place);
     }
@@ -144,7 +165,25 @@
     if (project.color) {
       color = project.color;
     }
-    return new ProjectRef(masks, project.title, color);
+    return new ProjectRef(masks, project.title, color, project.headingId);
+  };
+
+  function compareProjectRefs(lhs, rhs) {
+    const lhsTitle = lhs.titles.join(' - ');
+    const rhsTitle = rhs.titles.join(' - ');
+    return lhsTitle.localeCompare(rhsTitle);
+  };
+
+  InfraStructuredMap.prototype.handleFeatureClicked_ = function(event, feature) {
+    const activeProjects = feature.getActiveProjects();
+    activeProjects.sort(compareProjectRefs);
+    let content = '';
+    for (const projectRef of activeProjects) {
+      const title = projectRef.titles.join(' - ');
+      const href = this.baseHref + '#' + projectRef.headingId;
+      content += '<a href="' + href + '">' + title + '</a><br/>\n';
+    }
+    this.map.showInfoWindow(content, event.latLng);
   };
 
   root.InfraStructuredMap = InfraStructuredMap;
@@ -152,11 +191,11 @@
   /**
    * A common base class for features displayed on the map.
    * @constructor
-   * @param {google.maps.Map} map
+   * @param {InfraStructuredMap} infraMap
    * @param {MapChannel[]} channels
    */
-  function MapFeature(map, channels) {
-    this.map = map;
+  function MapFeature(infraMap, channels) {
+    this.infraMap = infraMap;
     this.channels = channels;
     this.channelMask = [];
     this.activeChannelCount = 0;
@@ -183,13 +222,10 @@
     return true;
   };
 
-  function compareProjectRefs(lhs, rhs) {
-    const lhsTitle = lhs.titles.join(' - ');
-    const rhsTitle = rhs.titles.join(' - ');
-    return lhsTitle.localeCompare(rhsTitle);
-  };
-
-  MapFeature.prototype.handleClick_ = function(event) {
+  /**
+   * @return {Array<ProjectRef>}
+   */
+  MapFeature.prototype.getActiveProjects = function() {
     const activeProjects = [];
     for (let index = 0; index < this.channels.length; ++index) {
       if (!this.channelMask[index]) {
@@ -202,12 +238,11 @@
         }
       }
     }
-    activeProjects.sort(compareProjectRefs);
-    let content = '';
-    for (const projectRef of activeProjects) {
-      content += projectRef.titles.join(' - ') + ' <br/>\n';
-    }
-    this.map.showInfoWindow(content, event.latLng);
+    return activeProjects;
+  };
+
+  MapFeature.prototype.handleClick_ = function(event) {
+    this.infraMap.handleFeatureClicked_(event, this);
   };
 
   /**
@@ -230,18 +265,18 @@
   /**
    * A polyline feature to be displayed on the map.
    * @constructor
-   * @param {google.maps.Map} map
+   * @param {InfraStructuredMap} infraMap
    * @param {MapChannel[]} channels
    * @param {google.maps.LatLng[]} path
    */
-  function MapSegment(map, channels, path) {
-    MapFeature.call(this, map, channels);
+  function MapSegment(infraMap, channels, path) {
+    MapFeature.call(this, infraMap, channels);
 
     this.options = {
       path: path,
       strokeOpacity: 0,
       icons: [],
-      map: map,
+      map: infraMap.map,
       clickable: true,
     };
     this.polyline = new google.maps.Polyline(this.options);
@@ -278,7 +313,7 @@
   /**
    * A point feature to be displayed on the map.
    * @constructor
-   * @param {google.maps.Map} map
+   * @param {InfraStructuredMap} map
    * @param {MapChannel[]} channels
    * @param {google.maps.LatLng} position
    */
@@ -328,7 +363,7 @@
       const options = {
         position: this.position,
         icon: circle,
-        map: this.map,
+        map: this.infraMap.map,
         clickable: true,
       };
       const marker = new google.maps.Marker(options);
@@ -359,11 +394,14 @@
          for the project
    * @param {string[]} titles - the title list (e.g. ["Transit", "Bus 17x"])
    * @param {string} color - the color for drawing this project on the map
+   * @param {string} headingId - the href anchor id for the section on the
+   *    resource page associated with this project
    */
-  function ProjectRef(propertyMasks, titles, color) {
+  function ProjectRef(propertyMasks, titles, color, headingId) {
     this.propertyMasks = propertyMasks;
     this.titles = titles;
     this.color = color;
+    this.headingId = headingId;
     return this;
   };
 

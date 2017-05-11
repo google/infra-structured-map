@@ -19,6 +19,13 @@ import java.util.List;
 
 public class ProjectReference {
   public List<String> title;
+
+  /**
+   * The HTML element id for the heading title element that should be referenced
+   * when linking to this project.
+   */
+  public String headingId;
+  
   public String timeline;
   public String status;
   public String color;

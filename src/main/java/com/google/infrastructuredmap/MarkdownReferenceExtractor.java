@@ -95,6 +95,8 @@ public class MarkdownReferenceExtractor {
         if (metadata.containsKey("label")) {
           reference.title.add(metadata.get("label"));
         }
+        reference.headingId = generateHeaderIdFromString(_headers.getFirst()); 
+        
         validate(id, reference);
         
         List<ProjectReference> references = _referencesById.get(id);
@@ -111,6 +113,11 @@ public class MarkdownReferenceExtractor {
         visit(child, prefix + "  ");
       }
     }
+  }
+  
+  private String generateHeaderIdFromString(String value) {
+    // This appears to be the rough strategy for turning header text into an anchor id in Markdown.
+    return value.toLowerCase().replaceAll("[^- \\w]", "").replaceAll(" +", "-");
   }
   
   private enum Status { COMPLETED, PLANNED, EVAL }
